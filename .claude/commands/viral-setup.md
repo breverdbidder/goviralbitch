@@ -43,8 +43,6 @@ python3 --version
 Check each critical import:
 
 ```bash
-python3 -c "import whisper; print('whisper OK')" 2>&1
-python3 -c "import instaloader; print('instaloader OK')" 2>&1
 python3 -c "import yt_dlp; print('yt_dlp OK')" 2>&1
 python3 -c "import flask; print('flask OK')" 2>&1
 python3 -c "import reportlab; print('reportlab OK')" 2>&1
@@ -52,6 +50,18 @@ python3 -c "import reportlab; print('reportlab OK')" 2>&1
 
 - Track which imports succeed and which fail
 - If any FAIL: collect into a missing list
+
+### Step 2.5: Optional Python Packages (Competitor Recon)
+
+```bash
+python3 -c "import whisper; print('whisper OK')" 2>&1
+python3 -c "import instaloader; print('instaloader OK')" 2>&1
+```
+
+- These are OPTIONAL — only needed for competitor content scraping and transcription
+- Show as [OPTIONAL] not [FAIL] if missing
+- Note: "To transcribe competitor videos, install whisper: pip3 install openai-whisper (requires ffmpeg)"
+- Note: "To scrape Instagram competitors, install instaloader: pip3 install instaloader"
 
 ### Step 3: CLI Tools
 
