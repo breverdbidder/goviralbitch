@@ -200,6 +200,98 @@ WHY IT WORKED:
 ═══════════════════════════════════════════════════
 ```
 
+### Step 6: Save Swipe Hooks (Transcribed Content Only)
+
+**This step only runs if at least one video/reel was transcribed in Step 4.** Skip entirely if the user selected "skip" in Step 4 or if no transcriptions completed successfully.
+
+After displaying all transcript breakdowns, present the swipe save prompt:
+
+```
+═══════════════════════════════════════════════════
+SWIPE FILE — Save Hook Inspiration
+═══════════════════════════════════════════════════
+
+These hooks came from real competitor videos with verified engagement.
+Saving them lets /viral:script generate swipe-influenced hooks alongside its standard output.
+
+{For each transcribed video, list the dissected hook:}
+
+ #  │ Competitor        │ Hook (opening words)                    │ Pattern
+────┼───────────────────┼─────────────────────────────────────────┼──────────────────────
+ 1  │ {competitor}      │ "{first ~8 words of hook}"...           │ {pattern type}
+ 2  │ {competitor}      │ "{first ~8 words of hook}"...           │ {pattern type}
+...
+
+Which hooks do you want to save to your swipe file?
+Enter numbers (e.g., "1, 3"), "all", or "skip":
+```
+
+**Wait for user input before proceeding.**
+
+**If "skip":** Continue to Phase 2 immediately. Do not write any files.
+
+**If "all" or specific numbers:**
+
+For each selected hook, build a swipe entry object matching `schemas/swipe-hook.schema.json`:
+
+**ID Generation:**
+1. Create `data/recon/swipe/` directory if it doesn't exist (`mkdir -p data/recon/swipe/`)
+2. Check today's swipe file: `data/recon/swipe/{YYYY-MM-DD}-hooks.jsonl`
+3. Find the highest existing sequence number in today's file (if any)
+4. Increment: `swipe_{YYYYMMDD}_{NNN}` with zero-padded 3-digit sequence
+5. If no file exists today, start at 001
+
+**For each selected hook, build the object:**
+
+```json
+{
+  "id": "swipe_{YYYYMMDD}_{NNN}",
+  "hook_text": "{exact opening words from transcript dissection — full hook line, not truncated}",
+  "pattern": "{pattern identified in Step 5 dissection — use exact enum value: contradiction/specificity/timeframe_tension/pov_as_advice/vulnerable_confession/pattern_interrupt}",
+  "why_it_works": "{the 'Why it works' analysis from Step 5 dissection — 1-2 sentences}",
+  "competitor": "{competitor name from agent brain}",
+  "platform": "{youtube_longform or instagram_reels — whichever this content came from}",
+  "url": "{direct URL from Step 3 table}",
+  "engagement": {
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "engagement_rate": 0
+  },
+  "competitor_angle": "{the contrast/angle the competitor used — from 'ANGLES USED' section of Step 5 breakdown, if identifiable, else ''}",
+  "topic_keywords": ["{extract 3-6 keywords from the hook text and video title — these drive /viral:script matching}"],
+  "source_video_title": "{full video title or first 100 chars of caption}",
+  "saved_at": "{current ISO timestamp}",
+  "used_count": 0,
+  "notes": ""
+}
+```
+
+**Fill `engagement` with actual stats** from the Step 3 ranking table (views, likes, comments, engagement_rate).
+
+**Write each entry as one JSON line to `data/recon/swipe/{YYYY-MM-DD}-hooks.jsonl`** (append if file exists for today).
+
+**Display confirmation:**
+
+```
+═══════════════════════════════════════════════════
+✓ Saved {N} hook(s) to swipe file
+
+data/recon/swipe/{YYYY-MM-DD}-hooks.jsonl
+
+These hooks will appear as inspiration options next time you run:
+  /viral:script {angle_id}
+
+═══════════════════════════════════════════════════
+```
+
+**Rules:**
+- Save `hook_text` as the FULL hook line from the transcript — not the truncated display version
+- `pattern` must use the exact enum values from the schema
+- `topic_keywords` should be thoughtful — extract what the angle is ABOUT, not filler words
+- Idempotent: if the same hook text already exists in today's file (check existing entries), skip it and note "already saved"
+- Do NOT save hooks from non-transcribed content (titles/captions only) — this step is transcript-exclusive
+
 ---
 
 ## Phase 2: Trend Discovery (Optional)

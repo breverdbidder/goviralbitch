@@ -262,6 +262,104 @@ Keep all hooks? [Y/n] or type numbers to drop (e.g., "drop 3, 5")
 
 ---
 
+## Phase D.5: Swipe-Influenced Hook Generation (Conditional)
+
+**This phase runs automatically after Phase D — no flag required.** It is skipped silently if no relevant swipe hooks exist.
+
+### Step 1: Check for Relevant Swipe Hooks
+
+Scan all files in `data/recon/swipe/` for swipe hook entries relevant to the current angle.
+
+**Relevance matching logic:**
+
+1. Extract keywords from the current angle:
+   - `angle.title` — split into meaningful words (skip stop words: the, a, to, for, in, on, of, with, how, I, you, your)
+   - `angle.contrast.common_belief` — extract nouns/verbs
+   - `angle.contrast.surprising_truth` — extract nouns/verbs
+
+2. Compare against each swipe entry's `topic_keywords` array
+
+3. A swipe entry is "relevant" if it shares at least 1 keyword match OR if the general topic domain overlaps (AI, automation, agency, clients, revenue — broad category match)
+
+4. Collect all matching entries into a `relevant_swipes[]` list
+
+**If `relevant_swipes` is empty:** Skip this phase entirely. Do not mention swipe to the user. Proceed directly to Phase E.
+
+**If `relevant_swipes` has entries:** Continue to Step 2.
+
+### Step 2: Generate Swipe-Influenced Hooks
+
+For each relevant swipe entry (max 3 to avoid output bloat), generate ONE swipe-influenced hook per platform in `platforms.posting[]`.
+
+**Generation rules — CRITICAL:**
+
+- The swipe hook is **structural inspiration only** — take the energy, rhythm, and pattern type, NOT the content
+- NEVER copy or closely paraphrase the competitor's hook text
+- The generated hook must express CHARLES'S angle and contrast, in his voice/tone from `identity.tone`
+- Tag each generated hook with which swipe entry inspired it
+
+**Generation approach per swipe entry:**
+
+```
+Swipe entry pattern: {e.g., "specificity"}
+Swipe entry energy: {derived from hook_text — e.g., "dollar-specific, outcome-first, no fluff"}
+Swipe why_it_works: {e.g., "anchors with a specific dollar amount which creates credibility"}
+
+Generate a hook using the same pattern and structural energy, but expressing the angle:
+  Common belief: {angle.contrast.common_belief}
+  Surprising truth: {angle.contrast.surprising_truth}
+  Proof method: {angle.proof_method}
+  Creator tone: {identity.tone}
+```
+
+**Apply the same scoring system from Phase B:**
+- contrast_fit, pattern_strength, platform_fit, composite
+- Apply hook_preferences boost from agent brain
+- Swipe-influenced hooks compete on the same scoring rubric — no artificial inflation
+
+### Step 3: Display Swipe-Influenced Hooks
+
+Display as a SEPARATE labeled section, appended BELOW the Phase D output:
+
+```
+═══════════════════════════════════════════════════
+HOOKS (Swipe-Influenced)
+Inspired by competitor hooks in your swipe file
+═══════════════════════════════════════════════════
+
+───────────────────────────────────────────────────
+📺 YOUTUBE LONGFORM — Swipe-Influenced
+───────────────────────────────────────────────────
+
+ #  │ Score │ Pattern              │ Hook                                          │ Inspired By
+────┼───────┼──────────────────────┼───────────────────────────────────────────────┼──────────────────────────────────
+ 1  │  8.3  │ specificity          │ "{hook text}"                                 │ Chase Hannegan — "I spent $50k on..."
+ 2  │  7.9  │ contradiction        │ "{hook text}"                                 │ Cooper Simson — "Everyone told me..."
+
+{Repeat per platform}
+
+═══════════════════════════════════════════════════
+Keep swipe-influenced hooks? [Y/n] or type numbers to drop
+(These save alongside your original hooks with source: "swipe")
+═══════════════════════════════════════════════════
+```
+
+**Display rules:**
+- "Inspired By" column shows ONLY: `{Competitor Name} — '{first 6-8 words}'...` — never the full competitor hook
+- Swipe-influenced hooks display with the SAME scoring columns as originals
+- The user can drop swipe hooks independently from original hooks
+
+**Wait for user input** before proceeding to Phase E.
+
+**Rules:**
+- Maximum 3 swipe entries queried per run
+- Maximum 1 swipe-influenced hook per swipe entry per platform
+- Swipe-influenced hooks use identical scoring to original hooks — same weights, same composite formula
+- If all swipe hooks score below 6.0 composite, display them anyway but note: "These scored lower than your standard hooks — use with caution"
+- Never show the full competitor hook text in the display — only the truncated "Inspired by" tag
+
+---
+
 ## Phase E: Persist Hooks
 
 Save approved hooks to `data/hooks.jsonl`:
@@ -290,6 +388,8 @@ Save approved hooks to `data/hooks.jsonl`:
   },
   "cta_pairing": "I break down exactly how to set up these agents in my Skool community — link in the description",
   "status": "draft",
+  "source": "original",
+  "swipe_reference": "",
   "performance": {},
   "created_at": "2026-03-04T14:30:00Z",
   "notes": ""

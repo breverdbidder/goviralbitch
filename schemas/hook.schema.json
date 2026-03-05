@@ -88,6 +88,16 @@
     },
     "notes": {
       "type": "string"
+    },
+    "source": {
+      "type": "string",
+      "enum": ["original", "swipe"],
+      "default": "original",
+      "description": "Whether this hook was generated fresh by HookGenie ('original') or inspired by a competitor swipe hook ('swipe')"
+    },
+    "swipe_reference": {
+      "type": "string",
+      "description": "If source is 'swipe', the swipe hook ID that inspired this (e.g., swipe_20260305_001)"
     }
   },
   "additionalProperties": false
