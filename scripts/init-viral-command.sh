@@ -13,10 +13,24 @@ if [[ "${1:-}" == "--force" ]]; then
     FORCE=true
 fi
 
-echo "═══════════════════════════════════════"
-echo "  VIRAL COMMAND — Initializing..."
-echo "  $(date +%Y-%m-%d\ %H:%M:%S)"
-echo "═══════════════════════════════════════"
+BLUE='\033[1;34m'
+CYAN='\033[1;36m'
+GREEN='\033[1;32m'
+WHITE='\033[1;37m'
+DIM='\033[2m'
+RESET='\033[0m'
+
+echo ""
+echo -e "${BLUE}    ██████╗ ██╗   ██╗██████╗ ${RESET}"
+echo -e "${BLUE}   ██╔════╝ ██║   ██║██╔══██╗${RESET}"
+echo -e "${BLUE}   ██║  ███╗██║   ██║██████╔╝${RESET}"
+echo -e "${BLUE}   ██║   ██║╚██╗ ██╔╝██╔══██╗${RESET}"
+echo -e "${BLUE}   ╚██████╔╝ ╚████╔╝ ██████╔╝${RESET}"
+echo -e "${BLUE}    ╚═════╝   ╚═══╝  ╚═════╝ ${RESET}"
+echo ""
+echo -e "   ${WHITE}Go Viral Bitch${RESET} ${DIM}v0.1.0${RESET}"
+echo -e "   ${DIM}Trainable social media coaching system${RESET}"
+echo -e "   ${DIM}for Claude Code.${RESET}"
 echo ""
 
 # Verify we're in the right repo
@@ -201,15 +215,14 @@ echo ""
 # ──────────────────────────────────────
 # Step 6: Summary
 # ──────────────────────────────────────
-echo "═══════════════════════════════════════"
-echo "  Viral Command — Setup Complete"
-echo "═══════════════════════════════════════"
-echo "  Directories:  OK"
-echo "  Data files:   OK"
-echo "  Dependencies: $DEPS_STATUS"
-echo "  CLI tools:    $CLI_STATUS"
-echo "  API keys:     $ENV_STATUS"
 echo ""
-echo "  Next: Run /viral:setup in Claude Code for guided API configuration"
-echo "  Or:   Run /viral:onboard to set up your creator profile"
-echo "═══════════════════════════════════════"
+echo -e "  ${GREEN}✓${RESET} Installed Viral Command"
+echo ""
+echo -e "  Directories:  OK"
+echo -e "  Data files:   OK"
+echo -e "  Dependencies: $DEPS_STATUS"
+echo -e "  CLI tools:    $CLI_STATUS"
+echo -e "  API keys:     $ENV_STATUS"
+echo ""
+echo -e "${GREEN}Done!${RESET} Run ${CYAN}/viral:setup${RESET} to get started."
+echo ""
