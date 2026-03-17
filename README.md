@@ -45,8 +45,8 @@ git clone https://github.com/charlesdove977/goviralbitch.git && cd goviralbitch 
 
 | Stage | What Happens |
 |-------|-------------|
-| **Discover** | Scan 9+ platforms for trending topics, score against your ICP, track competitors |
-| **Angle** | Apply Contrast Formula to turn raw topics into platform-specific angles with CTA direction |
+| **Discover** | Pull your competitors' winning content — see what got the most engagement, transcribe their videos, extract hook skeletons, and repurpose them in your voice. Currently supports YouTube + Instagram. More platforms coming. |
+| **Angle** | Apply Contrast Formula to turn raw topics into format-specific angles (longform, shortform, LinkedIn) |
 | **Script** | Generate hooks (6 patterns), full scripts (longform/shortform), filming cards, PDF lead magnets |
 | **Publish** | Schedule content via calendar, track ideas through pipeline stages |
 | **Analyze** | Pull analytics, extract winners, identify patterns, auto-update brain and hook repository |
@@ -59,12 +59,12 @@ git clone https://github.com/charlesdove977/goviralbitch.git && cd goviralbitch 
 |---------|-------------|
 | `/viral:setup` | Platform connection wizard — dependency check, API config, verification |
 | `/viral:onboard` | Interactive agent brain setup — ICP, pillars, platforms, competitors |
-| `/viral:discover` | Multi-platform topic discovery scored against your ICP |
-| `/viral:angle` | Contrast Formula angle development with platform templates |
-| `/viral:script` | HookGenie hooks + script generation (longform/shortform/PDF) |
-| `/viral:analyze` | Multi-platform analytics + winner extraction + feedback loop |
-| `/viral:ideas` | Idea board CRUD + pipeline funnel + content repurposing |
-| `/viral:status` | Pipeline dashboard — funnel, calendar, brain health |
+| `/viral:discover` | Pull competitor winning content — engagement data, transcripts, hook skeletons |
+| `/viral:angle` | Contrast Formula angle development — 5 angles per format (longform/shortform/LinkedIn) |
+| `/viral:script` | Interactive script generator — pick format → pick angle → hooks + full script + PDF option |
+| `/viral:analyze` 🚧 | Multi-platform analytics + winner extraction + feedback loop |
+| `/viral:ideas` 🚧 | Idea board CRUD + pipeline funnel + content repurposing |
+| `/viral:status` 🚧 | Pipeline dashboard — funnel, calendar, brain health |
 | `/viral:update-brain` | Brain evolution protocol + insight aggregation |
 
 ---
@@ -72,13 +72,14 @@ git clone https://github.com/charlesdove977/goviralbitch.git && cd goviralbitch 
 ## Features
 
 - **Agent brain** that evolves from your performance data
-- **9+ platform discovery** — YouTube, Instagram, TikTok, LinkedIn, Reddit, X, Hacker News, GitHub, Web
+- **Competitor intelligence** — pull their winning content, see engagement rankings, transcribe videos, extract hook skeletons, repurpose in your voice
 - **HookGenie engine** — 6 hook patterns with composite scoring
-- **Competitor tracking** — scrape, transcribe, extract content skeletons
+- **Format-based angles** — 5 angles per format (longform, shortform, LinkedIn) = 15 takes per topic
 - **PDF lead magnet generation** from any script
-- **Content calendar** with configurable cadence engine
-- **Automated cron** — daily discovery + weekly analysis, unattended
-- **Idea board** with pipeline funnel and content repurposing
+- **Discovery**: YouTube + Instagram live now — TikTok, LinkedIn, Reddit, X, Hacker News + more coming
+- **Automated cron** — daily discovery + weekly analysis scripts ready to install (`scripts/install-crons.sh`)
+- 🚧 **Idea board** with pipeline funnel and content repurposing
+- 🚧 **Content calendar** with configurable cadence engine
 - **Monetization coaching** baked into every output
 
 ---
