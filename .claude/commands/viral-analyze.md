@@ -15,6 +15,7 @@ Parse for:
 - `--content-id [ID]` — Analyze a specific script by ID
 - `--recent [N]` — Analyze last N published pieces (default: 5)
 - `--manual` — Non-interactive mode for cron/automation (skips prompts, analyzes all published content, runs full pipeline A-H without pauses)
+- `--deep-analysis` — Skip straight to Phase G.6 top 10 ranking + transcript/visual analysis (no new analytics collection — uses existing data)
 
 ---
 
@@ -39,14 +40,14 @@ If `--manual` flag is present:
   - **Phase H**: Run feedback loop without confirmation prompts
 - Platform flags still respected: `--manual --youtube` analyzes only YouTube content non-interactively
 - If no platform flag with `--manual`: defaults to `--all`
-- **Important**: In manual mode, platforms without API access (Instagram, TikTok, LinkedIn) are SKIPPED since they require interactive user input. Only YouTube (with API key configured) collects new data automatically.
+- **Important**: In manual mode, platforms without API access (TikTok, LinkedIn) are SKIPPED since they require interactive user input. YouTube (with API key) and Instagram (with Graph API token) collect data automatically. Platforms without configured APIs are skipped with a log message.
 
 ### Step 2: Determine Platform Scope
 
 Based on flags:
 - If `--youtube`, `--instagram`, `--tiktok`, or `--linkedin`: analyze only that platform
 - If `--all` or no platform flag: analyze all platforms in `platforms.posting`
-- If `MANUAL_MODE`: filter to only platforms with API access (currently YouTube only). Log skipped platforms: "Skipping [platform] — requires interactive input (not available in manual mode)"
+- If `MANUAL_MODE`: filter to only platforms with API access (YouTube with API key, Instagram with Graph API token). Log skipped platforms: "Skipping [platform] — requires interactive input (not available in manual mode)"
 - Filter to only platforms the user actually posts on
 
 ### Step 3: Determine API vs Interactive Mode
@@ -55,10 +56,17 @@ For each platform in scope, classify:
 
 | Platform | API Available? | Method |
 |----------|---------------|--------|
-| YouTube (longform/shorts) | Yes (if `youtube_data_v3` in api_keys_configured) | YouTube Data API v3 + user input for Studio metrics |
-| Instagram Reels | No | Interactive user input |
+| YouTube (longform/shorts) | Yes (if `youtube_data_v3` in api_keys_configured) | YouTube Data API v3 + auto-fetch via `scripts/fetch-yt-analytics.py` |
+| YouTube Analytics (CTR/subs/watch time) | Yes (if `~/.viral-command/yt-token.json` exists) | YouTube Analytics API via OAuth — auto-fetch |
+| Instagram Reels/Posts | Yes (if `INSTAGRAM_ACCESS_TOKEN` in .env) | Instagram Graph API via `scripts/fetch-ig-insights.py` |
+| Instagram (no token) | No | Interactive user input (fallback) |
 | TikTok | No | Interactive user input |
 | LinkedIn | No | Interactive user input |
+
+**API detection logic:**
+1. YouTube Data API: check `youtube_data_v3` in `platforms.api_keys_configured` AND `YOUTUBE_DATA_API_KEY` in `.env`
+2. YouTube Analytics API: check if `~/.viral-command/yt-token.json` exists (OAuth token from `setup-yt-oauth.py`)
+3. Instagram Graph API: check if `INSTAGRAM_ACCESS_TOKEN` is set in `.env` (from `setup-ig-token.py`)
 
 Display:
 ```
@@ -125,7 +133,7 @@ Proceed? (yes / edit / cancel)
 
 ---
 
-## Phase C: YouTube Data API Collection
+## Phase C: YouTube Auto-Fetch + Analytics Collection
 
 **Only runs if:**
 - YouTube content is in the analysis queue
@@ -139,30 +147,62 @@ From the source_url, extract video ID:
 - `youtube.com/shorts/VIDEO_ID` → extract VIDEO_ID
 - If no URL: ask user for video ID or URL
 
-### Step 2: Fetch via YouTube Data API v3
+### Step 2: Auto-Fetch via fetch-yt-analytics.py
 
-Run this bash command (API key from .env):
+Run the auto-fetch script:
+```bash
+python scripts/fetch-yt-analytics.py --video-id ${VIDEO_ID} --json
+```
+
+Parse the JSON response to extract:
+- `title` — verify matches expected content
+- `published_at` — published timestamp
+- `format` — `youtube_longform` or `youtube_shorts` (auto-detected from duration)
+- `thumbnail_url` — for Phase C.5
+- `metrics.views` → metrics.views
+- `metrics.likes` → metrics.likes
+- `metrics.comments` → metrics.comments
+- `metrics.avg_view_duration` → metrics.avg_view_duration (from YouTube Analytics API, if OAuth configured)
+- `metrics.estimated_minutes_watched` → total watch time (from YouTube Analytics API)
+- `metrics.subscribers_gained` → metrics.subscribers_gained (from YouTube Analytics API)
+- `analytics_api_available` — whether OAuth-based rich metrics were fetched
+
+**If the script fails** (exit code != 0): Fall back to the manual curl approach:
 ```bash
 source .env 2>/dev/null
-curl -s "https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${VIDEO_ID}&key=${YOUTUBE_DATA_API_KEY}"
+curl -s "https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet,contentDetails&id=${VIDEO_ID}&key=${YOUTUBE_DATA_API_KEY}"
 ```
 
-Extract from response:
-- `snippet.title` — verify matches expected content
-- `snippet.publishedAt` — published timestamp
-- `statistics.viewCount` → metrics.views
-- `statistics.likeCount` → metrics.likes
-- `statistics.commentCount` → metrics.comments
-- `snippet.thumbnails` → extract thumbnail URL using fallback chain: `maxres.url` → `high.url` → `medium.url` → `default.url`. Store as `thumbnail_url` for use in Phase C.5 and Phase E.
+**Collection method determination:**
+- If `analytics_api_available: true` → `collection_method: "youtube_analytics_api"`
+- If only Data API v3 worked → `collection_method: "youtube_data_api"`
+- If mixed with user input → `collection_method: "mixed"`
 
-### Step 3: Collect Studio Metrics (User Input)
+### Step 3: Collect Remaining Studio Metrics (User Input)
 
-The YouTube Data API v3 does NOT provide CTR, retention, or subscriber data. These require the YouTube Analytics API (OAuth), which is out of scope for v0.1.
+**CTR is NOT available via any YouTube API** — it requires YouTube Studio.
 
-Ask the user to check YouTube Studio:
-
+If `analytics_api_available` is true (OAuth token configured), only ask for:
 ```
 📊 YouTube Studio metrics for: "[title]"
+(Auto-fetched: views, likes, comments, avg view duration, subs gained ✓)
+
+Open YouTube Studio > Content > Click the video > Analytics
+
+1. CTR (Click-through rate): ___% (found under "Reach" tab)
+   → Type the number, or 'skip'
+
+2. 30-second retention: ___% (found in retention graph, hover at 0:30)
+   → Type the number, or 'skip'
+
+3. Average percentage viewed: ___% (found under "Engagement" tab)
+   → Type the number, or 'skip'
+```
+
+If `analytics_api_available` is false (no OAuth token), ask for ALL Studio metrics:
+```
+📊 YouTube Studio metrics for: "[title]"
+(Auto-fetched: views, likes, comments ✓ — set up YouTube Analytics API for more: python scripts/setup-yt-oauth.py)
 
 Open YouTube Studio > Content > Click the video > Analytics
 
@@ -182,6 +222,8 @@ Open YouTube Studio > Content > Click the video > Analytics
    → Type the number, or 'skip'
 ```
 
+**In `--manual` mode:** Skip all Studio metric prompts. Only auto-fetched data is collected.
+
 Parse responses:
 - Accept "skip", "don't know", "n/a", "-" → leave metric null
 - Accept percentage with or without % sign
@@ -190,14 +232,54 @@ Parse responses:
 
 ---
 
-## Phase D: Interactive Platform Collection
+## Phase D: Instagram Auto-Fetch + Interactive Platform Collection
 
-**Runs for each non-API platform in the analysis queue.**
+**Runs for each non-YouTube platform in the analysis queue.**
 
-### Instagram Reels / Posts
+### Instagram Reels / Posts — Auto-Fetch Mode
+
+**If `INSTAGRAM_ACCESS_TOKEN` is set in `.env`:**
+
+Run the auto-fetch script. For a known media ID:
+```bash
+python scripts/fetch-ig-insights.py --media-id ${MEDIA_ID} --json
+```
+
+Or fetch recent posts to find the right one:
+```bash
+python scripts/fetch-ig-insights.py --recent 10 --json
+```
+
+Parse the JSON response to extract:
+- `metrics.views` → metrics.views
+- `metrics.reach` → separate tracking (reach != views)
+- `metrics.likes` → metrics.likes
+- `metrics.comments` → metrics.comments
+- `metrics.shares` → metrics.shares
+- `metrics.saves` → metrics.saves
+- `metrics.engagement_rate` → metrics.engagement_rate
+- `metrics.followers_gained_attributed` → metrics.subscribers_gained (soft attribution)
+
+Set `collection_method: "instagram_graph_api"`.
+
+Display summary of auto-fetched data:
+```
+📊 Instagram auto-fetch for: "[title]"
+   Views: [N] | Reach: [N] | Likes: [N] | Comments: [N]
+   Shares: [N] | Saves: [N] | Eng Rate: [N]%
+   Followers gained (attributed): ~[N]
+   ✓ Collected via Instagram Graph API
+```
+
+**If fetch fails or token expired:** Show error and fall back to manual input below.
+
+### Instagram Reels / Posts — Manual Fallback
+
+**If `INSTAGRAM_ACCESS_TOKEN` is NOT set, or auto-fetch failed:**
 
 ```
 📊 Instagram metrics for: "[title]"
+(Set up auto-fetch: python scripts/setup-ig-token.py)
 
 Open Instagram > Go to the Reel/Post > Tap "View Insights"
 
@@ -440,6 +522,36 @@ Notable observations:
 - [Compare to averages if enough data exists]
 ```
 
+### Step 2.5: Subscriber / Follower Growth Summary
+
+**Only display if ANY entries in the current batch have `metrics.subscribers_gained` data.**
+
+For YouTube entries with `subscribers_gained`:
+```
+SUBSCRIBER GROWTH
+─────────────────────────────────────────────
+Top drivers (this batch):
+  #1 "[title]" → +[N] subs
+  #2 "[title]" → +[N] subs
+  #3 "[title]" → +[N] subs
+```
+
+For Instagram entries with `subscribers_gained` (from `followers_gained_attributed`):
+```
+FOLLOWER GROWTH (attributed)
+─────────────────────────────────────────────
+Top drivers (this batch):
+  #1 "[title]" ([date]) → +[N] followers
+  #2 "[title]" ([date]) → +[N] followers
+```
+
+**Drop-off alert:** If enough historical data exists (5+ entries with subscriber data for the platform):
+- Calculate the average `subscribers_gained` for the last 3 entries vs the prior average
+- If last 3 average is < 50% of prior average, display:
+```
+⚠ Drop-off: Last 3 videos avg +[N] subs (was +[M] prior avg)
+```
+
 ### Step 3: Feedback Loop Readiness Check
 
 Check `performance_patterns.total_content_analyzed` in agent brain:
@@ -651,6 +763,191 @@ If pillar data insufficient: `   Not enough pillar data yet.`
 
 ---
 
+## Phase G.6: Top 10 Winner Ranking + Deep Analysis Offer
+
+**Runs after Phase G.5**, using ALL analytics data (current + historical).
+
+### Step 1: Build the All-Time Top 10 List
+
+Read ALL entries from `data/analytics/analytics.jsonl`. Filter to `is_winner: true`.
+
+If fewer than 1 winner total: skip Phase G.6.
+
+For all winners, calculate a **composite score** to rank them:
+- Score = `(views / platform_median_views) * 0.4 + (engagement_rate / platform_median_engagement) * 0.35 + (subscribers_gained / platform_median_subs) * 0.25`
+- Skip any component where the metric is null (normalize weight across remaining components)
+- Sort descending by composite score, take top 10
+
+### Step 2: Display Ranked Table
+
+```
+════════════════════════════════════════
+🏆 TOP 10 WINNING CONTENT (all time)
+════════════════════════════════════════
+
+ #  │ Title                              │ Platform          │ Views   │ Eng%  │ Subs+ │ Link
+────┼────────────────────────────────────┼───────────────────┼─────────┼───────┼───────┼──────────────────────────
+ 1  │ [title]                            │ [platform]        │ [N]     │ [N%]  │ [N]   │ [source_url or "no url"]
+ 2  │ [title]                            │ [platform]        │ [N]     │ [N%]  │ [N]   │ [source_url or "no url"]
+ 3  │ [title]                            │ [platform]        │ [N]     │ [N%]  │ [N]   │ [source_url or "no url"]
+...
+10  │ [title]                            │ [platform]        │ [N]     │ [N%]  │ [N]   │ [source_url or "no url"]
+
+════════════════════════════════════════
+```
+
+- If `source_url` is null for an entry, show "no url"
+- Show actual URL (full link, clickable in terminal) — not shortened
+
+### Step 3: Offer Manual Review or Auto-Analyze
+
+Ask:
+```
+Want to go deeper on these winners?
+
+  [M] Manual — I'll click the links and review them myself
+  [A] Auto-analyze — run transcript + visual hook analysis now
+
+→
+```
+
+**If user chooses M (manual):**
+- Display: "Got it — links are above. Come back and run /viral:analyze --deep-analysis to run transcript + visual analysis anytime."
+- Skip to Phase H.
+
+**If user chooses A (auto-analyze):**
+- Proceed to Step 4.
+
+### Step 4: Select Depth
+
+Ask:
+```
+Analyze how many?
+
+  [3] Top 3
+  [5] Top 5
+  [10] All 10
+
+→
+```
+
+Accept `3`, `5`, `10`, or the words "top 3", "top 5", "all". Default to 3 if user just presses Enter.
+
+Slice the winner list to the chosen count. Skip any entries where:
+- `source_url` is null AND platform is not YouTube (can't auto-fetch without URL)
+- Platform is not YouTube or Instagram (TikTok/LinkedIn have no supported auto-fetch)
+
+Display: `"Analyzing [N] pieces — this may take a few minutes..."`
+
+### Step 5: Transcript + Visual Analysis
+
+For each selected winner, run the same analysis as `/viral:discover` Step 4 + Step 5:
+
+**For YouTube (longform or shorts):**
+
+```bash
+# Extract video ID from source_url
+VIDEO_ID=$(echo "[source_url]" | sed 's/.*[?&]v=\([^&]*\).*/\1/; s|.*/shorts/\([^?]*\).*|\1|')
+
+# Download first 60s (longform) or 30s (shorts)
+yt-dlp --external-downloader ffmpeg \
+  --external-downloader-args "ffmpeg_i:-t 60" \
+  -f "bestvideo[ext=mp4][height<=720]" \
+  -o "/tmp/vc_winner_${VIDEO_ID}.%(ext)s" \
+  "[source_url]"
+
+# Extract frames (1 per second, max 20 frames for longform / 15 for shorts)
+ffmpeg -i "/tmp/vc_winner_${VIDEO_ID}.mp4" \
+  -vf "fps=1,scale=640:-1" \
+  -frames:v 20 \
+  "/tmp/vc_winner_${VIDEO_ID}_frame_%03d.jpg" -y
+```
+
+Then read the frames via the Read tool (as images) and analyze them.
+
+**For Instagram Reels:**
+
+If `source_url` is an Instagram URL:
+```bash
+yt-dlp -f "bestvideo[ext=mp4][height<=720]" \
+  -o "/tmp/vc_winner_ig_%(id)s.%(ext)s" \
+  "[source_url]"
+
+ffmpeg -i "/tmp/vc_winner_ig_[id].mp4" \
+  -vf "fps=1,scale=640:-1" \
+  -frames:v 15 \
+  "/tmp/vc_winner_ig_[id]_frame_%03d.jpg" -y
+```
+
+**If download fails for any piece:** Log the error and continue to the next. Show all failures in the summary.
+
+### Step 6: Display Deep Analysis Per Winner
+
+For each winner analyzed, display:
+
+```
+────────────────────────────────────────
+🏆 #[rank]: [title]
+Platform: [platform] | Published: [date] | Views: [N] | Eng: [N%]
+Link: [source_url]
+────────────────────────────────────────
+
+VERBAL HOOK (first 3-5 seconds):
+  Opening line: "[exact words spoken]"
+  Hook pattern: [contradiction / specificity / timeframe_tension / etc.]
+  Hook strength: [weak / moderate / strong / excellent]
+  Why it works: [1 sentence]
+
+VISUAL HOOK (first 3 seconds on screen):
+  On screen: [what's shown — person, text, graphic, action]
+  Text overlays: [any text visible in first 3s or "none"]
+  Visual type: [talking-head / screen-recording / b-roll / text-only / etc.]
+  Pattern interrupt: [yes — describe / no]
+  Pacing: [slow / medium / fast / cut-heavy]
+
+WHAT'S SHOWN (0:03–0:20):
+  [description of the visual content — what draws attention, what's happening]
+
+WHY THIS WON:
+  [1-2 sentences connecting the hook/visual style to the performance metrics]
+  Proof: [N] views / [N%] engagement / +[N] subs
+```
+
+### Step 7: Winner Analysis Summary
+
+After all pieces are analyzed, display:
+
+```
+════════════════════════════════════════
+WINNER ANALYSIS COMPLETE
+════════════════════════════════════════
+
+Analyzed: [N] of [N selected]
+Failed:   [N] (listed below if any)
+
+COMMON PATTERNS IN YOUR TOP CONTENT:
+  Hook patterns: [most common across winners]
+  Visual type:   [most common]
+  Pattern interrupt: [% that used one]
+  Opening style: [observation about what winners open with]
+
+APPLY TO YOUR NEXT VIDEO:
+  → [1 specific hook recommendation based on what's winning]
+  → [1 specific visual/pacing recommendation]
+
+Failed downloads: [list titles + reason, or "none"]
+
+────────────────────────────────────────
+Next step: Run /viral:update-brain to push these patterns
+into your agent brain so future content uses what's winning.
+────────────────────────────────────────
+════════════════════════════════════════
+```
+
+After displaying, skip to Phase H.
+
+---
+
 ## Phase H: Feedback Loop
 
 **Runs after Phase G.5.** Auto-updates the hook repository and agent brain based on winner data.
@@ -835,7 +1132,7 @@ Together these two crons form the automated learning cycle: discover → create 
 2. **ALWAYS accept "skip"** for any metric. Partial data is better than no data.
 3. **Parse fuzzy numbers** — users will type "5k", "~800", "2.3M". Convert to integers.
 4. **YouTube Data API key** comes from `.env` file as `YOUTUBE_DATA_API_KEY`, not from agent-brain.json. The brain's `api_keys_configured` array only tracks WHICH APIs are set up.
-5. **Do NOT attempt YouTube Analytics API** — it requires OAuth and is out of scope for v0.1.
+5. **YouTube Analytics API** requires OAuth — run `python scripts/setup-yt-oauth.py` first. If token exists at `~/.viral-command/yt-token.json`, use `scripts/fetch-yt-analytics.py` for rich metrics (avg view duration, subs gained, watch time). CTR is NOT available via any API — always ask user for CTR.
 6. **Validate ranges** — CTR 0-100%, views >= 0, etc. Ask for confirmation if values seem wrong.
 7. **One entry per content piece per analysis run** — don't merge with previous entries. Multiple entries for the same content show performance over time.
 8. **is_winner is determined by Phase G** winner extraction using median-based platform-specific thresholds. Minimum 5 total analytics entries required before extraction activates. Multipliers are hardcoded for v0.1.
