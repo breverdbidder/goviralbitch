@@ -1,0 +1,53 @@
+name: "Sync Upstream — charlesdove977/goviralbitch"
+
+on:
+  schedule:
+    # Every Monday 06:00 UTC (1 AM EST) — weekly upstream check
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "BidDeed Bot"
+          git config user.email "bot@biddeed.ai"
+
+      - name: Add upstream and fetch
+        run: |
+          git remote add upstream https://github.com/charlesdove977/goviralbitch.git || true
+          git fetch upstream main
+
+      - name: Check for new commits
+        id: check
+        run: |
+          BEHIND=$(git rev-list --count HEAD..upstream/main)
+          echo "behind=$BEHIND" >> $GITHUB_OUTPUT
+          if [ "$BEHIND" -gt 0 ]; then
+            echo "🔄 $BEHIND new commits from upstream"
+          else
+            echo "✅ Already up to date with upstream"
+          fi
+
+      - name: Merge upstream changes
+        if: steps.check.outputs.behind != '0'
+        run: |
+          git merge upstream/main --no-edit --strategy-option theirs
+          git push origin main
+          echo "✅ Merged ${{ steps.check.outputs.behind }} upstream commits"
+
+      - name: Notify on conflict
+        if: failure()
+        run: |
+          echo "⚠️ Merge conflict detected — manual resolution needed"
+          echo "Run: git fetch upstream && git merge upstream/main"
